@@ -33,6 +33,14 @@ const URL_PATTERNS = [
   new RegExp(`^https://youtu\\.be/(${VIDEO_ID})(\\?.*)?$`),
 ];
 
+function videoIdFromUrl(url: string): string {
+  for (const pattern of URL_PATTERNS) {
+    const match = pattern.exec(url);
+    if (match) return match[1];
+  }
+  throw new Error(`VIDEO.json url is not a YouTube video address: ${url}`);
+}
+
 function readVideoUrl(botDir: string): string {
   const raw = readFileSync(join(botDir, 'VIDEO.json'), 'utf8');
   let parsed: unknown;
@@ -55,7 +63,16 @@ try {
   const url = readVideoUrl(BOT_DIR);
   mkdirSync(OUTPUT_DIR, { recursive: true });
   copyFileSync(join(BOT_DIR, 'VIDEO.json'), join(OUTPUT_DIR, 'VIDEO.json'));
-  console.log(`handed in video: ${url}`);
+  // Verify the copy before reporting success: re-read what actually landed
+  // in the output directory and confirm it parses to the same url, so a
+  // truncated or stale copy can never be handed in silently.
+  const copiedUrl = readVideoUrl(OUTPUT_DIR);
+  if (copiedUrl !== url) {
+    throw new Error(
+      `copied VIDEO.json url mismatch: expected ${url}, found ${copiedUrl}`,
+    );
+  }
+  console.log(`handed in video: ${url} (video id: ${videoIdFromUrl(url)})`);
 } catch (err) {
   console.error(`gta6-clipper-01: ${(err as Error).message}`);
   process.exit(1);
